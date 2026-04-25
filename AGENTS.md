@@ -27,7 +27,7 @@ A lightweight event-driven control plane that automatically triggers Devin AI to
 - **HTTP client:** `httpx` with `AsyncClient` — never use `requests`
 - **Config:** Load all env vars at module level using `os.getenv()` with `python-dotenv`
 - **Error handling:** Log errors and continue — never let a background task crash the process silently
-- **No database.** Use in-memory Python data structures (lists, dicts) for session state. Do not introduce SQLite, Postgres, or any persistence layer.
+- **Persistence:** Session and event state is stored in SQLite (`data/store.db`) using Python's stdlib `sqlite3`. Do not add heavier databases (Postgres, MySQL, etc.) or ORMs.
 - **No external dependencies beyond what is in `requirements.txt`.** Do not add packages without updating that file.
 
 ---
@@ -53,7 +53,7 @@ A lightweight event-driven control plane that automatically triggers Devin AI to
 ## Docker
 
 - The only command needed to run the system is `docker-compose up`
-- No volume mounts required (in-memory state, no database)
+- A named Docker volume (`db-data`) is mounted at `/app/data` to persist the SQLite database across container restarts
 - The image must build cleanly from scratch with no errors
 - `GET /health` must return 200 for the Docker healthcheck to pass
 
