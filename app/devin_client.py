@@ -16,6 +16,9 @@ TERMINAL_STATES = {"finished", "stopped", "failed", "blocked", "cancelled"}
 POLL_INTERVAL_SECONDS = 30
 MAX_POLL_INTERVAL_SECONDS = 300  # 5 minutes
 
+MAX_TITLE_LENGTH = 200
+MAX_BODY_LENGTH = 5000
+
 
 def _auth_headers() -> dict:
     return {
@@ -24,25 +27,35 @@ def _auth_headers() -> dict:
     }
 
 
+def sanitize_input(text: str, max_length: int) -> str:
+    """Strip control characters and cap length to prevent injection."""
+    cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    return cleaned[:max_length]
+
+
 def build_prompt(issue: dict) -> str:
     """Build the remediation prompt sent to Devin for a given GitHub issue."""
+    number = int(issue['number'])
+    title = sanitize_input(str(issue.get('title', '')), MAX_TITLE_LENGTH)
+    body = sanitize_input(str(issue.get('body', '')), MAX_BODY_LENGTH)
+
     return f"""You are a security engineer remediating a vulnerability in the Apache Superset repository.
 
 ## Repository
 GitHub: {GITHUB_REPO}
 Clone the repository if it is not already available to you.
 
-## Issue #{issue['number']}: {issue['title']}
+## Issue #{number}: {title}
 
-{issue['body']}
+{body}
 
 ## Your Task
 1. Locate the relevant file(s) in the codebase
 2. Implement a fix that addresses the root cause without breaking existing functionality
 3. Verify existing tests pass: pytest superset/tests/ -x -q
 4. Open a pull request with:
-   - Title: fix(security): {issue['title']}
-   - Body: Closes #{issue['number']}. Describe what you changed and why.
+   - Title: fix(security): {title}
+   - Body: Closes #{number}. Describe what you changed and why.
 
 Proceed immediately without asking for clarification.
 """
