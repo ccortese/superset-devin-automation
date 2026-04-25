@@ -60,6 +60,13 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         return {"status": "ignored", "reason": f"label '{label_name}' not targeted"}
 
     issue = _extract_issue(payload)
+
+    if store.has_session_for_issue(issue["number"]):
+        return {
+            "status": "ignored",
+            "reason": f"session already exists for issue #{issue['number']}",
+        }
+
     store.log_event(
         "webhook_received",
         f"Issue #{issue['number']}: {issue['title']}",

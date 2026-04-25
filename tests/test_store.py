@@ -75,3 +75,18 @@ def test_clear_wipes_all_state():
     store.clear()
     assert store.get_all_sessions() == []
     assert store.get_recent_events() == []
+
+
+def test_has_session_for_issue_returns_true_when_exists():
+    store.add_session("abc", 42, "title", "url", "url")
+    assert store.has_session_for_issue(42) is True
+
+
+def test_has_session_for_issue_returns_false_when_missing():
+    assert store.has_session_for_issue(99) is False
+
+
+def test_has_session_for_issue_after_clear():
+    store.add_session("abc", 1, "title", "url", "url")
+    store.clear()
+    assert store.has_session_for_issue(1) is False

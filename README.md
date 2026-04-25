@@ -21,7 +21,7 @@ GitHub Issue (labeled "devin-remediate")
 │  webhook.py       validates HMAC, enqueues background task
 │  devin_client.py  creates Devin session, polls until done
 │  github_client.py posts PR comment back to issue
-│  store.py         in-memory session + event state
+│  store.py         SQLite-backed session + event state
 │  analytics.py     aggregates store + Devin Analytics API
 │  api.py           GET /api/* endpoints for the dashboard
 │  dashboard/       single-page HTML UI, auto-refreshes
@@ -93,8 +93,17 @@ Values in `.env` are populated from Devin's shell state using `$VAR_NAME` syntax
 | `GITHUB_REPO` | `$GITHUB_REPO` | Format: `username/superset` |
 | `WEBHOOK_SECRET` | `$WEBHOOK_SECRET` | Must match the secret set in your GitHub webhook |
 | `DEVIN_BASE_URL` | Optional | Default: `https://api.devin.ai/v1` |
+| `DB_PATH` | Optional | SQLite database path. Default: `data/store.db` |
 
 ## Related Repositories
 
 - **This repo:** Automation control plane
 - **[ccortese/superset](https://github.com/ccortese/superset):** Forked Apache Superset with security issues
+
+## Data Persistence
+
+Session and event data is stored in a SQLite database at `data/store.db` (configurable via `DB_PATH`). The Docker volume `db-data` ensures data survives container restarts.
+
+## Duplicate Prevention
+
+If a webhook arrives for an issue that already has a session, it is silently ignored (returns `{"status": "ignored", "reason": "session already exists for issue #N"}`). This prevents duplicate Devin sessions and wasted API calls.

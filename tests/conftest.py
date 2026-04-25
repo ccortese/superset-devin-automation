@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 import httpx
 import pytest
@@ -11,6 +12,10 @@ os.environ["GITHUB_TOKEN"] = "test-github-token"
 os.environ["GITHUB_REPO"] = "testuser/superset"
 os.environ["WEBHOOK_SECRET"] = "testsecret"
 os.environ["DEVIN_BASE_URL"] = "https://api.devin.ai/v1"
+
+# Use a temp directory for the SQLite database so tests don't pollute the project
+_test_db_dir = tempfile.mkdtemp()
+os.environ["DB_PATH"] = os.path.join(_test_db_dir, "test_store.db")
 
 from app.main import app  # noqa: E402 — must come after env setup
 from app import store     # noqa: E402
@@ -38,7 +43,7 @@ async def client():
 
 @pytest.fixture(autouse=True)
 def reset_store():
-    """Automatically wipe in-memory state before and after every test."""
+    """Automatically wipe SQLite state before and after every test."""
     store.clear()
     yield
     store.clear()

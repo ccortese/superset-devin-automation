@@ -113,3 +113,52 @@ async def test_valid_webhook_logs_event(client, monkeypatch):
     )
     events = store.get_recent_events()
     assert any(e["type"] == "webhook_received" for e in events)
+
+
+async def test_duplicate_issue_returns_ignored(client, monkeypatch):
+    from app import store
+
+    def mock_create_session(issue: dict) -> None:
+        store.add_session(
+            "mock-session", issue["number"], issue["title"],
+            issue["html_url"], "http://devin",
+        )
+
+    monkeypatch.setattr("app.webhook.create_session", mock_create_session)
+
+    payload = _make_payload(issue_number=7)
+    headers = {
+        "X-GitHub-Event": "issues",
+        "X-Hub-Signature-256": _sign(payload),
+        "Content-Type": "application/json",
+    }
+
+    first = await client.post("/webhook", content=payload, headers=headers)
+    assert first.status_code == 200
+    assert first.json()["status"] == "accepted"
+
+    second = await client.post("/webhook", content=payload, headers=headers)
+    assert second.status_code == 200
+    assert second.json()["status"] == "ignored"
+    assert "already exists" in second.json()["reason"]
+
+
+async def test_duplicate_blocked_by_store_session(client, monkeypatch):
+    from app import store
+    monkeypatch.setattr("app.webhook.create_session", lambda issue: None)
+
+    store.add_session("existing-session", 7, "title", "url", "url")
+
+    payload = _make_payload(issue_number=7)
+    response = await client.post(
+        "/webhook",
+        content=payload,
+        headers={
+            "X-GitHub-Event": "issues",
+            "X-Hub-Signature-256": _sign(payload),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "ignored"
+    assert "already exists" in response.json()["reason"]
