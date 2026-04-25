@@ -98,6 +98,16 @@ def update_session(
     return _row_to_dict(row)
 
 
+def get_session_by_id(session_id: str) -> Optional[dict]:
+    """Return a single session by ID using a parameterized query, or None."""
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT * FROM sessions WHERE id = ?", (session_id,)
+    ).fetchone()
+    conn.close()
+    return _row_to_dict(row) if row else None
+
+
 def get_all_sessions() -> list[dict]:
     """Return all sessions as a list, unfiltered."""
     conn = _get_conn()
@@ -144,10 +154,11 @@ def log_event(
 
 def get_recent_events(limit: int = 50) -> list[dict]:
     """Return the most recent events first, capped at limit."""
+    safe_limit = max(1, int(limit))
     conn = _get_conn()
     rows = conn.execute(
         "SELECT type, message, issue_number, session_id, created_at FROM events ORDER BY rowid DESC LIMIT ?",
-        (limit,),
+        (safe_limit,),
     ).fetchall()
     conn.close()
     return [_row_to_dict(r) for r in rows]
