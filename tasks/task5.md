@@ -52,6 +52,8 @@ async def comment_on_issue(issue_number: int, body: str) -> dict:
 
 ### tests/test_github_client.py
 
+Note: Tests use `monkeypatch.setattr` (not `monkeypatch.setenv`) because `GITHUB_TOKEN` and `GITHUB_REPO` are loaded as **module-level** variables at import time. Changing `os.environ` after import has no effect on the already-bound module variables.
+
 ```python
 import httpx
 import pytest
@@ -62,8 +64,8 @@ from app.github_client import comment_on_issue
 
 @pytest.mark.asyncio
 async def test_comment_posts_to_correct_url(monkeypatch):
-    monkeypatch.setenv("GITHUB_TOKEN", "test-token")
-    monkeypatch.setenv("GITHUB_REPO", "testuser/superset")
+    monkeypatch.setattr("app.github_client.GITHUB_TOKEN", "test-token")
+    monkeypatch.setattr("app.github_client.GITHUB_REPO", "testuser/superset")
 
     with respx.mock:
         route = respx.post(
@@ -78,8 +80,8 @@ async def test_comment_posts_to_correct_url(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_comment_raises_on_non_2xx(monkeypatch):
-    monkeypatch.setenv("GITHUB_TOKEN", "test-token")
-    monkeypatch.setenv("GITHUB_REPO", "testuser/superset")
+    monkeypatch.setattr("app.github_client.GITHUB_TOKEN", "test-token")
+    monkeypatch.setattr("app.github_client.GITHUB_REPO", "testuser/superset")
 
     with respx.mock:
         respx.post(
@@ -92,8 +94,8 @@ async def test_comment_raises_on_non_2xx(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_comment_uses_bearer_auth(monkeypatch):
-    monkeypatch.setenv("GITHUB_TOKEN", "my-secret-token")
-    monkeypatch.setenv("GITHUB_REPO", "testuser/superset")
+    monkeypatch.setattr("app.github_client.GITHUB_TOKEN", "my-secret-token")
+    monkeypatch.setattr("app.github_client.GITHUB_REPO", "testuser/superset")
 
     with respx.mock:
         route = respx.post(
@@ -108,8 +110,8 @@ async def test_comment_uses_bearer_auth(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_comment_sends_correct_body(monkeypatch):
-    monkeypatch.setenv("GITHUB_TOKEN", "test-token")
-    monkeypatch.setenv("GITHUB_REPO", "testuser/superset")
+    monkeypatch.setattr("app.github_client.GITHUB_TOKEN", "test-token")
+    monkeypatch.setattr("app.github_client.GITHUB_REPO", "testuser/superset")
 
     with respx.mock:
         route = respx.post(

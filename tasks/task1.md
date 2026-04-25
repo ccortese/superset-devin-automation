@@ -28,11 +28,10 @@ superset-devin-automation/
     └── test_main.py
 ```
 
-Also create these as empty files (content added in later tasks):
+Also create these files as stubs (full content added in later tasks):
+
 ```
-app/store.py
 app/webhook.py
-app/devin_client.py
 app/github_client.py
 app/analytics.py
 app/api.py
@@ -46,6 +45,27 @@ tests/test_analytics.py
 tests/test_api.py
 ```
 
+**`app/store.py`** — needs a minimal `clear()` function so the autouse fixture in `conftest.py` works from Task 1 onward:
+
+```python
+# Minimal stub — full implementation in Task 2.
+
+def clear():
+    """Reset all state. Populated in Task 2."""
+    pass
+```
+
+**`app/devin_client.py`** — needs a `create_session` stub because `webhook.py` (Task 3) imports it at module level:
+
+```python
+# Minimal stub — full implementation in Task 4.
+
+
+async def create_session(issue: dict) -> None:
+    """Create a Devin session. Populated in Task 4."""
+    pass
+```
+
 ---
 
 ## Implementation
@@ -56,6 +76,9 @@ tests/test_api.py
 FROM python:3.11-slim
 
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
