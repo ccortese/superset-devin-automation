@@ -13,8 +13,10 @@ if _missing:
 
 from datetime import datetime, timezone
 from fastapi import FastAPI
+from app.webhook import router as webhook_router
 
 app = FastAPI(title="Devin Remediation Control Plane")
+app.include_router(webhook_router)
 
 
 @app.get("/health")
