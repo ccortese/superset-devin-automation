@@ -118,7 +118,7 @@ WEBHOOK_SECRET=$WEBHOOK_SECRET
 DEVIN_BASE_URL=https://api.devin.ai/v1
 ```
 
-All five are required. The app exits on startup with a clear error if any are missing.
+The first four (`DEVIN_API_KEY`, `GITHUB_TOKEN`, `GITHUB_REPO`, `WEBHOOK_SECRET`) are required. The app exits on startup with a clear error if any are missing. `DEVIN_BASE_URL` is optional and defaults to `https://api.devin.ai/v1`.
 
 ---
 
