@@ -1,11 +1,14 @@
 import hashlib
 import hmac
+import logging
 import os
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from app import store
 from app.devin_client import create_session
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -14,10 +17,29 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 def _verify_signature(payload: bytes, header: str) -> bool:
     """Return True if the HMAC-SHA256 signature matches the payload."""
+    if not WEBHOOK_SECRET:
+        logger.error("WEBHOOK_SECRET is not configured — rejecting request")
+        return False
+    if not header:
+        return False
     expected = "sha256=" + hmac.new(
         WEBHOOK_SECRET.encode(), payload, hashlib.sha256
     ).hexdigest()
     return hmac.compare_digest(expected, header)
+
+
+def _extract_issue(payload: dict) -> dict:
+    """Validate and return the issue object from the webhook payload."""
+    issue = payload.get("issue")
+    if not isinstance(issue, dict):
+        raise HTTPException(status_code=400, detail="Missing or invalid 'issue' in payload")
+    for field in ("number", "title", "body", "html_url"):
+        if field not in issue:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required field 'issue.{field}'",
+            )
+    return issue
 
 
 @router.post("/webhook")
@@ -37,7 +59,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     if label_name != "devin-remediate":
         return {"status": "ignored", "reason": f"label '{label_name}' not targeted"}
 
-    issue = payload["issue"]
+    issue = _extract_issue(payload)
     store.log_event(
         "webhook_received",
         f"Issue #{issue['number']}: {issue['title']}",
