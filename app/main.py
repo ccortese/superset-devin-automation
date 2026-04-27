@@ -22,6 +22,31 @@ from app.api import router as api_router
 from app.devin_client import resume_active_sessions
 from app.webhook import router as webhook_router
 
+# ---------------------------------------------------------------------------
+# CSRF / request-forgery protection
+# ---------------------------------------------------------------------------
+# FastAPI does not include built-in CSRF middleware. This application relies
+# on the following controls instead:
+#
+# 1. **Webhook endpoint (POST /webhook)** – Every incoming request is
+#    validated against an HMAC-SHA256 signature derived from WEBHOOK_SECRET.
+#    See webhook.py `_verify_signature()`. Without the shared secret an
+#    attacker cannot forge a valid request, which provides equivalent
+#    protection to a CSRF token for this endpoint.
+#
+# 2. **API endpoints (GET /api/*)** – All API routes are read-only GET
+#    requests that do not mutate state, so they are not susceptible to
+#    CSRF attacks.
+#
+# 3. **Dashboard (GET /dashboard)** – Serves a static HTML page with no
+#    form submissions and no cookie-based authentication, so CSRF is not
+#    applicable.
+#
+# If mutating (POST/PUT/DELETE) API routes are added in the future, a
+# proper CSRF middleware (e.g. starlette-csrf) or token-based auth header
+# requirement should be introduced.
+# ---------------------------------------------------------------------------
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
