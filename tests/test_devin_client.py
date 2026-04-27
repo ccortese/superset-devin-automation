@@ -265,3 +265,36 @@ async def test_monitor_detects_terminal_via_status_enum(monkeypatch):
     assert session["pr_url"] == "https://github.com/testuser/superset/pull/99"
     events = store.get_recent_events()
     assert any(e["type"] == "pr_opened" and "pull/99" in e["message"] for e in events)
+
+
+@pytest.mark.asyncio
+async def test_monitor_completes_even_when_comment_fails(monkeypatch):
+    """Session should be marked finished even if posting the GitHub comment raises."""
+    store.add_session(
+        session_id="ses-comment-fail",
+        issue_number=88,
+        issue_title="Comment fail test",
+        issue_url="https://github.com/testuser/superset/issues/88",
+        devin_url="https://app.devin.ai/sessions/ses-comment-fail",
+    )
+
+    async def fake_get_session(session_id):
+        return {
+            "session_id": session_id,
+            "status_enum": "finished",
+            "url": "https://app.devin.ai/sessions/ses-comment-fail",
+            "pull_request": {"url": "https://github.com/testuser/superset/pull/55"},
+        }
+
+    async def fake_comment_raises(issue_number, body):
+        raise Exception("401 Unauthorized")
+
+    monkeypatch.setattr("app.devin_client.get_session", fake_get_session)
+    monkeypatch.setattr("app.github_client.comment_on_issue", fake_comment_raises)
+
+    await _monitor_session("ses-comment-fail", 88)
+
+    session = store.get_session_by_id("ses-comment-fail")
+    assert session["status"] == "finished"
+    assert session["pr_url"] == "https://github.com/testuser/superset/pull/55"
+    assert session["finished_at"] is not None

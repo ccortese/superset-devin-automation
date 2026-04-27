@@ -90,3 +90,12 @@ def test_has_session_for_issue_after_clear():
     store.add_session("abc", 1, "title", "url", "url")
     store.clear()
     assert store.has_session_for_issue(1) is False
+
+
+def test_update_session_does_not_overwrite_finished_at():
+    store.add_session("abc", 1, "title", "url", "url")
+    first = store.update_session("abc", "finished", pr_url="http://pr/1")
+    original_finished_at = first["finished_at"]
+    assert original_finished_at is not None
+    second = store.update_session("abc", "finished", pr_url="http://pr/1")
+    assert second["finished_at"] == original_finished_at
