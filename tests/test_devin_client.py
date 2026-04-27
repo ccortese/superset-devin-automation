@@ -5,6 +5,8 @@ import respx
 from app import store
 from app.devin_client import (
     DEVIN_BASE_URL,
+    MAX_CONSECUTIVE_ERRORS,
+    _monitor_session,
     build_prompt,
     create_session,
     extract_pr_url,
@@ -178,3 +180,48 @@ async def test_resume_logs_monitoring_resumed_event(monkeypatch):
 
     events = store.get_recent_events()
     assert any(e["type"] == "monitoring_resumed" and "ses-log" in e["message"] for e in events)
+
+
+@pytest.mark.asyncio
+async def test_monitor_session_fails_after_max_consecutive_errors(monkeypatch):
+    """After MAX_CONSECUTIVE_ERRORS poll failures, session should be marked failed."""
+    store.add_session(
+        session_id="ses-err",
+        issue_number=99,
+        issue_title="Error test",
+        issue_url="https://github.com/testuser/superset/issues/99",
+        devin_url="https://app.devin.ai/sessions/ses-err",
+    )
+
+    call_count = 0
+
+    async def fake_get_session(session_id):
+        nonlocal call_count
+        call_count += 1
+        raise httpx.HTTPStatusError(
+            "Not Found",
+            request=httpx.Request("GET", f"{DEVIN_BASE_URL}/sessions/{session_id}"),
+            response=httpx.Response(404),
+        )
+
+    async def fake_comment(issue_number, body):
+        pass
+
+    import asyncio
+
+    original_sleep = asyncio.sleep
+
+    monkeypatch.setattr("app.devin_client.get_session", fake_get_session)
+    monkeypatch.setattr("app.github_client.comment_on_issue", fake_comment)
+    monkeypatch.setattr("asyncio.sleep", lambda _: original_sleep(0))
+
+    await _monitor_session("ses-err", 99)
+
+    assert call_count == MAX_CONSECUTIVE_ERRORS
+    session = store.get_session_by_id("ses-err")
+    assert session["status"] == "failed"
+    events = store.get_recent_events()
+    assert any(
+        e["type"] == "session_failed" and "consecutive poll errors" in e["message"]
+        for e in events
+    )
