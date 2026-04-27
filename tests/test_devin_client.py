@@ -230,3 +230,38 @@ async def test_monitor_session_fails_after_max_consecutive_errors(monkeypatch):
     assert len(comment_calls) == 1
     assert comment_calls[0][0] == 99
     assert "poll errors" in comment_calls[0][1]
+
+
+@pytest.mark.asyncio
+async def test_monitor_detects_terminal_via_status_enum(monkeypatch):
+    """When status is 'suspended' but status_enum is 'finished', session should complete."""
+    store.add_session(
+        session_id="ses-enum",
+        issue_number=77,
+        issue_title="Enum test",
+        issue_url="https://github.com/testuser/superset/issues/77",
+        devin_url="https://app.devin.ai/sessions/ses-enum",
+    )
+
+    async def fake_get_session(session_id):
+        return {
+            "session_id": session_id,
+            "status": "suspended",
+            "status_enum": "finished",
+            "url": "https://app.devin.ai/sessions/ses-enum",
+            "pull_request": {"url": "https://github.com/testuser/superset/pull/99"},
+        }
+
+    async def fake_comment(issue_number, body):
+        pass
+
+    monkeypatch.setattr("app.devin_client.get_session", fake_get_session)
+    monkeypatch.setattr("app.github_client.comment_on_issue", fake_comment)
+
+    await _monitor_session("ses-enum", 77)
+
+    session = store.get_session_by_id("ses-enum")
+    assert session["status"] == "finished"
+    assert session["pr_url"] == "https://github.com/testuser/superset/pull/99"
+    events = store.get_recent_events()
+    assert any(e["type"] == "pr_opened" and "pull/99" in e["message"] for e in events)
