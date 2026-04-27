@@ -208,6 +208,14 @@ async def _monitor_session(session_id: str, issue_number: int) -> None:
                     session_id=session_id,
                     issue_number=issue_number,
                 )
+                try:
+                    await comment_on_issue(
+                        issue_number,
+                        f"Devin session failed after {MAX_CONSECUTIVE_ERRORS} consecutive poll errors.\n\n"
+                        f"**Session:** {session_id}",
+                    )
+                except Exception:
+                    logger.error("Failed to comment on issue #%s after poll error limit", issue_number)
                 return
             await asyncio.sleep(60)
 

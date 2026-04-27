@@ -194,6 +194,7 @@ async def test_monitor_session_fails_after_max_consecutive_errors(monkeypatch):
     )
 
     call_count = 0
+    comment_calls = []
 
     async def fake_get_session(session_id):
         nonlocal call_count
@@ -205,7 +206,7 @@ async def test_monitor_session_fails_after_max_consecutive_errors(monkeypatch):
         )
 
     async def fake_comment(issue_number, body):
-        pass
+        comment_calls.append((issue_number, body))
 
     import asyncio
 
@@ -225,3 +226,7 @@ async def test_monitor_session_fails_after_max_consecutive_errors(monkeypatch):
         e["type"] == "session_failed" and "consecutive poll errors" in e["message"]
         for e in events
     )
+    # Verify a comment was posted on the GitHub issue
+    assert len(comment_calls) == 1
+    assert comment_calls[0][0] == 99
+    assert "poll errors" in comment_calls[0][1]
