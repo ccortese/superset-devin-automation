@@ -188,7 +188,10 @@ async def _monitor_session(session_id: str, issue_number: int) -> None:
                         f"**Session:** {session_url}"
                     )
 
-                await comment_on_issue(issue_number, msg)
+                try:
+                    await comment_on_issue(issue_number, msg)
+                except Exception as exc:
+                    logger.error("Failed to comment on issue #%s: %s", issue_number, exc)
                 return
 
             await asyncio.sleep(backoff)

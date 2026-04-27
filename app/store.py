@@ -85,7 +85,9 @@ def update_session(
         conn.close()
         return None
 
-    finished_at = datetime.now(timezone.utc).isoformat() if status in ("finished", "failed") else existing["finished_at"]
+    finished_at = existing["finished_at"] or (
+        datetime.now(timezone.utc).isoformat() if status in ("finished", "failed") else None
+    )
     new_pr_url = pr_url if pr_url else existing["pr_url"]
 
     conn.execute(
