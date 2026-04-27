@@ -18,6 +18,7 @@ TERMINAL_STATES = {"finished", "stopped", "failed", "blocked", "cancelled"}
 
 POLL_INTERVAL_SECONDS = 30
 MAX_POLL_INTERVAL_SECONDS = 300  # 5 minutes
+MAX_CONSECUTIVE_ERRORS = 10
 
 
 def _auth_headers() -> dict:
@@ -147,11 +148,13 @@ async def _monitor_session(session_id: str, issue_number: int) -> None:
     from app.github_client import comment_on_issue  # imported here to avoid circular import
 
     backoff = POLL_INTERVAL_SECONDS
+    consecutive_errors = 0
 
     while True:
         try:
             data = await get_session(session_id)
             status = data.get("status", "unknown")
+            consecutive_errors = 0
 
             if status in TERMINAL_STATES:
                 pr_url = extract_pr_url(data)
@@ -191,11 +194,29 @@ async def _monitor_session(session_id: str, issue_number: int) -> None:
             backoff = min(backoff * 1.5, MAX_POLL_INTERVAL_SECONDS)
 
         except Exception as e:
+            consecutive_errors += 1
             store.log_event(
                 "error",
                 f"Poll error for session {session_id}: {e}",
                 session_id=session_id,
             )
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                store.update_session(session_id, status="failed")
+                store.log_event(
+                    "session_failed",
+                    f"Session {session_id} marked failed after {MAX_CONSECUTIVE_ERRORS} consecutive poll errors",
+                    session_id=session_id,
+                    issue_number=issue_number,
+                )
+                try:
+                    await comment_on_issue(
+                        issue_number,
+                        f"Devin session failed after {MAX_CONSECUTIVE_ERRORS} consecutive poll errors.\n\n"
+                        f"**Session:** {session_id}",
+                    )
+                except Exception:
+                    logger.error("Failed to comment on issue #%s after poll error limit", issue_number)
+                return
             await asyncio.sleep(60)
 
 
