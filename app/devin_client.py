@@ -15,7 +15,7 @@ GITHUB_REPO = os.getenv("GITHUB_REPO", "")
 
 # Devin session states that indicate the session has finished (success or failure).
 # The API may return the terminal state in either "status" or "status_enum".
-TERMINAL_STATES = {"finished", "stopped", "failed", "blocked", "cancelled", "suspended"}
+TERMINAL_STATES = {"finished", "stopped", "failed", "blocked", "cancelled"}
 
 POLL_INTERVAL_SECONDS = 30
 MAX_POLL_INTERVAL_SECONDS = 300  # 5 minutes
