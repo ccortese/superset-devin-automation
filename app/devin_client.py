@@ -13,7 +13,8 @@ DEVIN_BASE_URL = os.getenv("DEVIN_BASE_URL", "https://api.devin.ai/v1")
 DEVIN_API_KEY = os.getenv("DEVIN_API_KEY", "")
 GITHUB_REPO = os.getenv("GITHUB_REPO", "")
 
-# Devin session states that indicate the session has finished (success or failure)
+# Devin session states that indicate the session has finished (success or failure).
+# The API may return the terminal state in either "status" or "status_enum".
 TERMINAL_STATES = {"finished", "stopped", "failed", "blocked", "cancelled"}
 
 POLL_INTERVAL_SECONDS = 30
@@ -153,7 +154,7 @@ async def _monitor_session(session_id: str, issue_number: int) -> None:
     while True:
         try:
             data = await get_session(session_id)
-            status = data.get("status", "unknown")
+            status = data.get("status_enum") or data.get("status") or "unknown"
             consecutive_errors = 0
 
             if status in TERMINAL_STATES:
