@@ -11,6 +11,7 @@ if _missing:
     print(f"[ERROR] Missing required environment variables: {', '.join(_missing)}", file=sys.stderr)
     sys.exit(1)
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
@@ -18,9 +19,18 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import router as api_router
+from app.devin_client import resume_active_sessions
 from app.webhook import router as webhook_router
 
-app = FastAPI(title="Devin Remediation Control Plane")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Resume monitoring for any sessions that were running before a restart."""
+    await resume_active_sessions()
+    yield
+
+
+app = FastAPI(title="Devin Remediation Control Plane", lifespan=lifespan)
 
 app.include_router(webhook_router)
 app.include_router(api_router)

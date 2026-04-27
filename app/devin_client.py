@@ -1,10 +1,13 @@
 import asyncio
+import logging
 import os
 import re
 
 import httpx
 
 from app import store
+
+logger = logging.getLogger(__name__)
 
 DEVIN_BASE_URL = os.getenv("DEVIN_BASE_URL", "https://api.devin.ai/v1")
 DEVIN_API_KEY = os.getenv("DEVIN_API_KEY", "")
@@ -64,17 +67,26 @@ async def create_session(issue: dict) -> None:
     Create a Devin session for the given issue, record it in the store,
     and spawn a background task to monitor it until completion.
     """
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(
-            f"{DEVIN_BASE_URL}/sessions",
-            headers=_auth_headers(),
-            json={
-                "prompt": build_prompt(issue),
-                "idempotency_key": f"issue-{issue['number']}",
-            },
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                f"{DEVIN_BASE_URL}/sessions",
+                headers=_auth_headers(),
+                json={
+                    "prompt": build_prompt(issue),
+                    "idempotency_key": f"issue-{issue['number']}",
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+    except Exception as exc:
+        logger.error("Failed to create Devin session for issue #%s: %s", issue["number"], exc)
+        store.log_event(
+            "error",
+            f"Failed to create Devin session for issue #{issue['number']}: {exc}",
+            issue_number=issue["number"],
         )
-        response.raise_for_status()
-        data = response.json()
+        return
 
     session_id = data["session_id"]
     devin_url = data.get("url", "")
@@ -185,3 +197,24 @@ async def _monitor_session(session_id: str, issue_number: int) -> None:
                 session_id=session_id,
             )
             await asyncio.sleep(60)
+
+
+async def resume_active_sessions() -> None:
+    """
+    Resume monitoring for all sessions that are still in 'running' state.
+    Called on application startup to recover from container restarts.
+    """
+    active = store.get_active_sessions()
+    if not active:
+        return
+    logger.info("Resuming monitoring for %d active session(s)", len(active))
+    for session in active:
+        session_id = session["id"]
+        issue_number = session["issue_number"]
+        store.log_event(
+            "monitoring_resumed",
+            f"Resumed monitoring for session {session_id} (issue #{issue_number})",
+            session_id=session_id,
+            issue_number=issue_number,
+        )
+        asyncio.create_task(_monitor_session(session_id, issue_number))
