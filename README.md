@@ -31,17 +31,67 @@ GitHub Issue (labeled "devin-remediate")
    docker-compose up  (only command needed)
 ```
 
-## Quick Start
+## Running Locally
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- A [Devin API key](https://app.devin.ai/settings/api)
+- A GitHub Personal Access Token with `repo` scope
+- (Optional) [ngrok](https://ngrok.com/) for receiving live webhooks during local development
+
+### 1. Clone and configure
 
 ```bash
 git clone https://github.com/ccortese/superset-devin-automation.git
 cd superset-devin-automation
 cp .env.example .env
-# Edit .env — fill in DEVIN_API_KEY, GITHUB_TOKEN, GITHUB_REPO, WEBHOOK_SECRET
-docker-compose up
 ```
 
-Open http://localhost:8000/dashboard
+Edit `.env` and fill in the required values:
+
+```env
+DEVIN_API_KEY=<your Devin API key>
+GITHUB_TOKEN=<your GitHub PAT>
+GITHUB_REPO=ccortese/superset
+WEBHOOK_SECRET=<a random secret string>
+```
+
+### 2. Build and start
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+### 3. Verify it's running
+
+```bash
+curl http://localhost:8000/health
+# → {"status":"ok","timestamp":"..."}
+```
+
+Open the dashboard at **http://localhost:8000/dashboard**.
+
+### 4. Rebuild after pulling updates
+
+```bash
+git pull origin main
+docker compose down
+docker compose build
+docker compose up -d
+```
+
+### 5. Reset the database (optional)
+
+To wipe all session and event data and start fresh:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+The `-v` flag removes the Docker volume that persists the SQLite database.
 
 ## Register the GitHub Webhook
 
@@ -58,7 +108,7 @@ To trigger a remediation: open any issue in your Superset fork and apply the `de
 ## Test Locally (No GitHub Needed)
 
 ```bash
-./scripts/simulate_webhook.sh 1 "[SECURITY] SQL injection risk"
+WEBHOOK_SECRET=<your secret> ./scripts/simulate_webhook.sh 1 "[SECURITY] SQL injection risk"
 ```
 
 Then check the dashboard and API:
@@ -68,6 +118,15 @@ curl http://localhost:8000/api/sessions
 curl http://localhost:8000/api/analytics
 curl http://localhost:8000/api/events
 ```
+
+## Running Tests
+
+```bash
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+All 56 tests should pass. Tests mock all external HTTP calls (Devin API, GitHub API) so no credentials are needed.
 
 ## API Reference
 
@@ -84,16 +143,28 @@ curl http://localhost:8000/api/events
 
 ## Environment Variables
 
-Values in `.env` are populated from Devin's shell state using `$VAR_NAME` syntax. Set these in your Devin secrets store before running.
-
-| Variable | Secret Reference | Description |
+| Variable | Required | Description |
 |---|---|---|
-| `DEVIN_API_KEY` | `$DEVIN_API_KEY` | From [app.devin.ai/settings/api](https://app.devin.ai/settings/api) |
-| `GITHUB_TOKEN` | `$GITHUB_TOKEN` | GitHub PAT with `repo` scope |
-| `GITHUB_REPO` | `$GITHUB_REPO` | Format: `username/superset` |
-| `WEBHOOK_SECRET` | `$WEBHOOK_SECRET` | Must match the secret set in your GitHub webhook |
-| `DEVIN_BASE_URL` | Optional | Default: `https://api.devin.ai/v1` |
-| `DB_PATH` | Optional | SQLite database path. Default: `data/store.db` |
+| `DEVIN_API_KEY` | Yes | Devin API key from [app.devin.ai/settings/api](https://app.devin.ai/settings/api) |
+| `GITHUB_TOKEN` | Yes | GitHub PAT with `repo` scope |
+| `GITHUB_REPO` | Yes | Target repository, e.g. `ccortese/superset` |
+| `WEBHOOK_SECRET` | Yes | HMAC secret — must match the secret configured in your GitHub webhook |
+| `DEVIN_BASE_URL` | No | Default: `https://api.devin.ai/v1` |
+| `DB_PATH` | No | SQLite database path. Default: `data/store.db` |
+
+## Merged Pull Requests
+
+| PR | Title | What it fixed |
+|---|---|---|
+| [#1](https://github.com/ccortese/superset-devin-automation/pull/1) | fix: correct bugs in task specs | Fixed stubs, healthcheck, test mocking, and env var docs in task specifications |
+| [#2](https://github.com/ccortese/superset-devin-automation/pull/2) | feat: implement full vulnerability remediation control plane | Initial implementation of all 10 tasks — webhook handler, Devin client, GitHub client, store, analytics, dashboard, API routes, and simulate script |
+| [#3](https://github.com/ccortese/superset-devin-automation/pull/3) | fix(security): harden webhook signature verification | Prevented empty `WEBHOOK_SECRET` bypass, missing signature header bypass, and unvalidated webhook payloads |
+| [#5](https://github.com/ccortese/superset-devin-automation/pull/5) | feat: add SQLite persistence and duplicate issue prevention | Replaced in-memory store with SQLite so sessions survive container restarts; added dedup check to prevent duplicate Devin sessions |
+| [#6](https://github.com/ccortese/superset-devin-automation/pull/6) | fix(security): prevent SQL injection in session lookup | Added parameterized queries for session-by-ID lookup and input validation on event limit parameter |
+| [#7](https://github.com/ccortese/superset-devin-automation/pull/7) | fix: resume session monitoring after container restart | Added startup recovery that re-spawns monitors for all "running" sessions; added error handling for Devin API failures during session creation |
+| [#8](https://github.com/ccortese/superset-devin-automation/pull/8) | fix: mark sessions failed after repeated poll errors | Sessions are now marked "failed" after 10 consecutive Devin API poll errors instead of retrying forever |
+| [#9](https://github.com/ccortese/superset-devin-automation/pull/9) | fix: use status_enum from Devin API to detect completed sessions | The Devin API returns `status: "suspended"` but `status_enum: "finished"` for completed sessions — now checks `status_enum` first |
+| [#11](https://github.com/ccortese/superset-devin-automation/pull/11) | fix: prevent avg duration from counting up indefinitely | Fixed two bugs: `comment_on_issue` failure no longer restarts the monitor loop, and `finished_at` is preserved on repeated updates |
 
 ## Related Repositories
 
