@@ -152,19 +152,17 @@ All 56 tests should pass. Tests mock all external HTTP calls (Devin API, GitHub 
 | `DEVIN_BASE_URL` | No | Default: `https://api.devin.ai/v1` |
 | `DB_PATH` | No | SQLite database path. Default: `data/store.db` |
 
-## Merged Pull Requests
+## Remediated Vulnerabilities (Merged PRs on [ccortese/superset](https://github.com/ccortese/superset))
 
-| PR | Title | What it fixed |
-|---|---|---|
-| [#1](https://github.com/ccortese/superset-devin-automation/pull/1) | fix: correct bugs in task specs | Fixed stubs, healthcheck, test mocking, and env var docs in task specifications |
-| [#2](https://github.com/ccortese/superset-devin-automation/pull/2) | feat: implement full vulnerability remediation control plane | Initial implementation of all 10 tasks — webhook handler, Devin client, GitHub client, store, analytics, dashboard, API routes, and simulate script |
-| [#3](https://github.com/ccortese/superset-devin-automation/pull/3) | fix(security): harden webhook signature verification | Prevented empty `WEBHOOK_SECRET` bypass, missing signature header bypass, and unvalidated webhook payloads |
-| [#5](https://github.com/ccortese/superset-devin-automation/pull/5) | feat: add SQLite persistence and duplicate issue prevention | Replaced in-memory store with SQLite so sessions survive container restarts; added dedup check to prevent duplicate Devin sessions |
-| [#6](https://github.com/ccortese/superset-devin-automation/pull/6) | fix(security): prevent SQL injection in session lookup | Added parameterized queries for session-by-ID lookup and input validation on event limit parameter |
-| [#7](https://github.com/ccortese/superset-devin-automation/pull/7) | fix: resume session monitoring after container restart | Added startup recovery that re-spawns monitors for all "running" sessions; added error handling for Devin API failures during session creation |
-| [#8](https://github.com/ccortese/superset-devin-automation/pull/8) | fix: mark sessions failed after repeated poll errors | Sessions are now marked "failed" after 10 consecutive Devin API poll errors instead of retrying forever |
-| [#9](https://github.com/ccortese/superset-devin-automation/pull/9) | fix: use status_enum from Devin API to detect completed sessions | The Devin API returns `status: "suspended"` but `status_enum: "finished"` for completed sessions — now checks `status_enum` first |
-| [#11](https://github.com/ccortese/superset-devin-automation/pull/11) | fix: prevent avg duration from counting up indefinitely | Fixed two bugs: `comment_on_issue` failure no longer restarts the monitor loop, and `finished_at` is preserved on repeated updates |
+These pull requests were automatically created by the control plane via Devin AI sessions and merged into the Superset fork:
+
+| PR | CVE / Issue | Vulnerability | Fix |
+|---|---|---|---|
+| [#27](https://github.com/ccortese/superset/pull/27) | [CVE-2023-46104](https://github.com/ccortese/superset/issues/24) | ZIP bomb DoS via malicious import | Added max entry count, total size limit, and blocked file extension checks to `check_is_safe_zip()` |
+| [#31](https://github.com/ccortese/superset/pull/31) | [CVE-2024-53948](https://github.com/ccortese/superset/issues/20) | SQL injection in Row Level Security `clause` field | Added `validate_rls_clause()` that rejects subqueries, UNIONs, stacked statements, and DML/DDL via sqlglot AST analysis |
+| [#33](https://github.com/ccortese/superset/pull/33) | [CVE-2024-53951](https://github.com/ccortese/superset/issues/23) | Ownership takeover of dashboards and charts | Added `validate_owners_update()` requiring existing ownership before modifying the owners list |
+| [#34](https://github.com/ccortese/superset/pull/34) | [CVE-2024-53949](https://github.com/ccortese/superset/issues/22) | SQL function denylist bypass via inline block comments | Added `strip_sql_block_comments()` to normalize SQL before denylist matching |
+| [#36](https://github.com/ccortese/superset/pull/36) | [#35](https://github.com/ccortese/superset/issues/35) | Missing CSRF token validation documentation | Added documentation comment explaining why `WTF_CSRF_ENABLED` must remain enabled |
 
 ## Related Repositories
 
