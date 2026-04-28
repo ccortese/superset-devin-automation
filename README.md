@@ -31,17 +31,67 @@ GitHub Issue (labeled "devin-remediate")
    docker-compose up  (only command needed)
 ```
 
-## Quick Start
+## Running Locally
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- A [Devin API key](https://app.devin.ai/settings/api)
+- A GitHub Personal Access Token with `repo` scope
+- (Optional) [ngrok](https://ngrok.com/) for receiving live webhooks during local development
+
+### 1. Clone and configure
 
 ```bash
 git clone https://github.com/ccortese/superset-devin-automation.git
 cd superset-devin-automation
 cp .env.example .env
-# Edit .env — fill in DEVIN_API_KEY, GITHUB_TOKEN, GITHUB_REPO, WEBHOOK_SECRET
-docker-compose up
 ```
 
-Open http://localhost:8000/dashboard
+Edit `.env` and fill in the required values:
+
+```env
+DEVIN_API_KEY=<your Devin API key>
+GITHUB_TOKEN=<your GitHub PAT>
+GITHUB_REPO=ccortese/superset
+WEBHOOK_SECRET=<a random secret string>
+```
+
+### 2. Build and start
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+### 3. Verify it's running
+
+```bash
+curl http://localhost:8000/health
+# → {"status":"ok","timestamp":"..."}
+```
+
+Open the dashboard at **http://localhost:8000/dashboard**.
+
+### 4. Rebuild after pulling updates
+
+```bash
+git pull origin main
+docker compose down
+docker compose build
+docker compose up -d
+```
+
+### 5. Reset the database (optional)
+
+To wipe all session and event data and start fresh:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+The `-v` flag removes the Docker volume that persists the SQLite database.
 
 ## Register the GitHub Webhook
 
@@ -58,7 +108,7 @@ To trigger a remediation: open any issue in your Superset fork and apply the `de
 ## Test Locally (No GitHub Needed)
 
 ```bash
-./scripts/simulate_webhook.sh 1 "[SECURITY] SQL injection risk"
+WEBHOOK_SECRET=<your secret> ./scripts/simulate_webhook.sh 1 "[SECURITY] SQL injection risk"
 ```
 
 Then check the dashboard and API:
@@ -68,6 +118,15 @@ curl http://localhost:8000/api/sessions
 curl http://localhost:8000/api/analytics
 curl http://localhost:8000/api/events
 ```
+
+## Running Tests
+
+```bash
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+All 56 tests should pass. Tests mock all external HTTP calls (Devin API, GitHub API) so no credentials are needed.
 
 ## API Reference
 
@@ -84,16 +143,26 @@ curl http://localhost:8000/api/events
 
 ## Environment Variables
 
-Values in `.env` are populated from Devin's shell state using `$VAR_NAME` syntax. Set these in your Devin secrets store before running.
-
-| Variable | Secret Reference | Description |
+| Variable | Required | Description |
 |---|---|---|
-| `DEVIN_API_KEY` | `$DEVIN_API_KEY` | From [app.devin.ai/settings/api](https://app.devin.ai/settings/api) |
-| `GITHUB_TOKEN` | `$GITHUB_TOKEN` | GitHub PAT with `repo` scope |
-| `GITHUB_REPO` | `$GITHUB_REPO` | Format: `username/superset` |
-| `WEBHOOK_SECRET` | `$WEBHOOK_SECRET` | Must match the secret set in your GitHub webhook |
-| `DEVIN_BASE_URL` | Optional | Default: `https://api.devin.ai/v1` |
-| `DB_PATH` | Optional | SQLite database path. Default: `data/store.db` |
+| `DEVIN_API_KEY` | Yes | Devin API key from [app.devin.ai/settings/api](https://app.devin.ai/settings/api) |
+| `GITHUB_TOKEN` | Yes | GitHub PAT with `repo` scope |
+| `GITHUB_REPO` | Yes | Target repository, e.g. `ccortese/superset` |
+| `WEBHOOK_SECRET` | Yes | HMAC secret — must match the secret configured in your GitHub webhook |
+| `DEVIN_BASE_URL` | No | Default: `https://api.devin.ai/v1` |
+| `DB_PATH` | No | SQLite database path. Default: `data/store.db` |
+
+## Remediated Vulnerabilities (Merged PRs on [ccortese/superset](https://github.com/ccortese/superset))
+
+These pull requests were automatically created by the control plane via Devin AI sessions and merged into the Superset fork:
+
+| PR | CVE / Issue | Vulnerability | Fix |
+|---|---|---|---|
+| [#27](https://github.com/ccortese/superset/pull/27) | [CVE-2023-46104](https://github.com/ccortese/superset/issues/24) | ZIP bomb DoS via malicious import | Added max entry count, total size limit, and blocked file extension checks to `check_is_safe_zip()` |
+| [#31](https://github.com/ccortese/superset/pull/31) | [CVE-2024-53948](https://github.com/ccortese/superset/issues/20) | SQL injection in Row Level Security `clause` field | Added `validate_rls_clause()` that rejects subqueries, UNIONs, stacked statements, and DML/DDL via sqlglot AST analysis |
+| [#33](https://github.com/ccortese/superset/pull/33) | [CVE-2024-53951](https://github.com/ccortese/superset/issues/23) | Ownership takeover of dashboards and charts | Added `validate_owners_update()` requiring existing ownership before modifying the owners list |
+| [#34](https://github.com/ccortese/superset/pull/34) | [CVE-2024-53949](https://github.com/ccortese/superset/issues/22) | SQL function denylist bypass via inline block comments | Added `strip_sql_block_comments()` to normalize SQL before denylist matching |
+| [#36](https://github.com/ccortese/superset/pull/36) | [#35](https://github.com/ccortese/superset/issues/35) | Missing CSRF token validation documentation | Added documentation comment explaining why `WTF_CSRF_ENABLED` must remain enabled |
 
 ## Related Repositories
 
